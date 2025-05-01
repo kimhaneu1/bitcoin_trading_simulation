@@ -1,47 +1,40 @@
+// 차트 랜더링 컴포넌트
+// src/components/CandleChart.tsx
 import React, { useEffect, useRef } from 'react';
 import { createChart, IChartApi, ISeriesApi, BarData } from 'lightweight-charts';
 
 interface CandleChartProps {
-  data: BarData[]; // Define the expected structure of the data prop
+  data: BarData[];
 }
 
 const CandleChart: React.FC<CandleChartProps> = ({ data }) => {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+    if (!containerRef.current) return;
 
-    chartRef.current = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
+    chartRef.current = createChart(containerRef.current, {
+      width: containerRef.current.clientWidth,
       height: 400,
-      layout: {
-        background: { color: '#ffffff' },
-        textColor: '#000',
-      },
-      grid: {
-        vertLines: { color: '#eee' },
-        horzLines: { color: '#eee' },
-      },
-      timeScale: {
-        timeVisible: true,
-        secondsVisible: false,
-      },
+      layout: { background: { color: '#fff' }, textColor: '#000' },
+      grid: { vertLines: { color: '#eee' }, horzLines: { color: '#eee' } },
+      timeScale: { timeVisible: true },
     });
 
-    const candleSeries: ISeriesApi<'Candlestick'> = chartRef.current.addCandlestickSeries({
+    const series: ISeriesApi<'Candlestick'> = chartRef.current.addCandlestickSeries({
       upColor: '#26a69a',
       downColor: '#ef5350',
       wickUpColor: '#26a69a',
       wickDownColor: '#ef5350',
     });
 
-    candleSeries.setData(data);
+    series.setData(data);
     chartRef.current.timeScale().fitContent();
 
     const handleResize = () => {
-      if (chartRef.current && chartContainerRef.current) {
-        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+      if (containerRef.current) {
+        chartRef.current?.applyOptions({ width: containerRef.current.clientWidth });
       }
     };
 
@@ -52,7 +45,7 @@ const CandleChart: React.FC<CandleChartProps> = ({ data }) => {
     };
   }, [data]);
 
-  return <div ref={chartContainerRef} />;
+  return <div ref={containerRef} />;
 };
 
 export default CandleChart;
