@@ -4,6 +4,7 @@ import ChartArea from '../components/ChartArea';
 import OrderForm from '../components/OrderForm';
 import OrderBook from '../components/OrderBook';
 import MiniDepthChart from '../components/MiniDepthChart';
+import TradeHistory from '../components/TradeHistory';
 import CoinListSidebar from '../components/CoinListSidebar';
 import AdvertisementBanner from '../components/AdvertisementBanner';
 
@@ -24,6 +25,8 @@ export default function Home() {
             <OrderForm />
             <MiniDepthChart />
           </div>
+          {/* 체결 내역 추가 */}
+          <TradeHistory />
         </div>
 
         {/* 우측: 사이드바 (lg 이상에서만 오른쪽에 보임) */}

@@ -1,18 +1,18 @@
-// 차트 랜더링 컴포넌트
-// src/components/CandleChart.tsx
 import React, { useEffect, useRef } from 'react';
-import { createChart, IChartApi, ISeriesApi, BarData } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData } from 'lightweight-charts';
 
 interface CandleChartProps {
-  data: BarData[];
+  data: CandlestickData[];
 }
 
 const CandleChart: React.FC<CandleChartProps> = ({ data }) => {
   const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // 차트 생성
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || chartRef.current) return;
 
     chartRef.current = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
@@ -22,14 +22,13 @@ const CandleChart: React.FC<CandleChartProps> = ({ data }) => {
       timeScale: { timeVisible: true },
     });
 
-    const series: ISeriesApi<'Candlestick'> = chartRef.current.addCandlestickSeries({
+    seriesRef.current = chartRef.current.addCandlestickSeries({
       upColor: '#26a69a',
       downColor: '#ef5350',
       wickUpColor: '#26a69a',
       wickDownColor: '#ef5350',
     });
 
-    series.setData(data);
     chartRef.current.timeScale().fitContent();
 
     const handleResize = () => {
@@ -43,6 +42,13 @@ const CandleChart: React.FC<CandleChartProps> = ({ data }) => {
       window.removeEventListener('resize', handleResize);
       chartRef.current?.remove();
     };
+  }, []);
+
+  // 데이터가 바뀌면 차트 갱신 (재마운트 X)
+  useEffect(() => {
+    if (seriesRef.current) {
+      seriesRef.current.setData(data);
+    }
   }, [data]);
 
   return <div ref={containerRef} />;
