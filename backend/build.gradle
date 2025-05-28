@@ -46,6 +46,9 @@ dependencies {
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 
+	// Bean Validation (JSR-380) 구현체
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+
 }
 
 test {

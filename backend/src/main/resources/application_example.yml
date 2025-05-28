@@ -14,5 +14,6 @@ spring:
         format_sql: true
 
 jwt:
-  secret: # jwt 에서 사용할 키 값 ( 이걸 기준으로 키 생성 )
-  expiration: # 만료 시간, 3600000 = 1시간 (ms)
+  secret: #  암호화에 사용할 해쉬값 ( 이걸 기준으로 키 생성 )
+  access-expiration-ms: # accessToken 만료 시간, 3600000 = 1시간 (ms)
+  refresh-expiration-ms: # refreshToken 만료 시간
