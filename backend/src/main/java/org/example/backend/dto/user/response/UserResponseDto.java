@@ -5,14 +5,16 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserResponseDto {
-    private Long id;
     private String username;
     private String email;
+    private String phoneNumber;
+    private LocalDateTime registeredAt;
     private BigDecimal balance;
 }

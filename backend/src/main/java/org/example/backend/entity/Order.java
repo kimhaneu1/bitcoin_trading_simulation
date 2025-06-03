@@ -2,12 +2,10 @@ package org.example.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.example.backend.entity.enums.OrderState;
-import org.example.backend.entity.enums.OrderType;
-import org.example.backend.entity.enums.Side;
+import org.example.backend.entity.enums.ExecutionType;
+import org.example.backend.entity.enums.TradeType;
+import org.example.backend.entity.enums.OrderStatus;
 
-import java.util.List;
-import java.util.ArrayList;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -22,34 +20,22 @@ public class Order {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Side side;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private OrderType ordType;
-
-    private BigDecimal price;
-
-    private BigDecimal volume;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private OrderState state;
-
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<Fill> fills = new ArrayList<>();
+    private String market;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "market_id", nullable = false)
-    private Market market;
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status; // PENDING, COMPLETED
+
+    @Enumerated(EnumType.STRING)
+    private TradeType tradeType; // BUY, SELL
+
+    @Enumerated(EnumType.STRING)
+    private ExecutionType executionType; // MARKET, LIMIT
+
+    private BigDecimal quantity;
+    private BigDecimal priceAtOrderTime;
+    private LocalDateTime orderedAt;
 }

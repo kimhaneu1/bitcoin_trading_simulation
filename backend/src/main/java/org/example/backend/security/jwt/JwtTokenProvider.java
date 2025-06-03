@@ -10,7 +10,11 @@ import org.example.backend.exception.requestError.auth.InvalidTokenException;
 import org.example.backend.exception.requestError.auth.TokenMissingException;
 import org.example.backend.exception.requestError.auth.TokenTypeMismatchException;
 import org.example.backend.repository.RefreshTokenRepository;
+import org.example.backend.security.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -32,6 +36,7 @@ public class JwtTokenProvider {
     private long refreshTokenExpirationMs;
 
     private final RefreshTokenRepository refreshTokenRepository;
+    private final CustomUserDetailsService customUserDetailsService;
 
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(secretKey.getBytes());
@@ -80,7 +85,7 @@ public class JwtTokenProvider {
         Date now = Date.from(Instant.now());
         Date expiry = new Date(now.getTime() + refreshTokenExpirationMs);
 
-        String token = Jwts.builder()
+        return Jwts.builder()
                 .setId(jti)
                 .setSubject(email)
                 .claim("role", role)
@@ -89,10 +94,8 @@ public class JwtTokenProvider {
                 .setExpiration(expiry)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
-
-        refreshTokenRepository.save(new RefreshToken(jti, email, expiry.toInstant(), false));
-        return token;
     }
+
 
     public void validateRefreshToken(String token) {
         Jws<Claims> claims = parseClaims(token);
@@ -118,5 +121,16 @@ public class JwtTokenProvider {
 
     public Instant getExpirationDateFromToken(String token) {
         return parseClaims(token).getBody().getExpiration().toInstant();
+    }
+
+    public Authentication getAuthentication(String token) {
+        String email = getEmailFromToken(token);
+        UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
+
+        return new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities()
+        );
     }
 }

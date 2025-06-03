@@ -2,26 +2,35 @@ package org.example.backend.dto.user.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.backend.security.ValidPassword;
 
 @Getter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class UserCreateRequestDto {
 
-    @NotBlank(message = "닉네임을 입력해주세요.")
-    @Size(min = 4, max = 10, message = "최소 4글자, 최대 10글자 제한입니다.")
+    @NotBlank
+    @Size(max = 10)
     private String username;
 
-    @NotBlank(message = "비밀번호를 입력해주세요.")
+    @NotBlank
     @ValidPassword
-    @Size(min = 8, max = 20, message = "최소 8글자, 최대 20글자 제한입니다.")
+    @Size(max = 20)
     private String password;
 
-    @NotBlank(message = "이메일을 입력해주세요.")
-    @Size(min = 5, max = 30, message = "최소 5글자, 최대 30글자 제한입니다.")
-    @Email(message = "올바른 이메일 형식이 아닙니다.")
+    @NotBlank
+    @Size(max = 25)
+    @Email()
     private String email;
+
+    @NotBlank
+    @Pattern(regexp = "^010-\\d{4}-\\d{4}$")
+    private String phoneNumber;
 }

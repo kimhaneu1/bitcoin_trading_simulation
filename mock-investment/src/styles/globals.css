@@ -26,3 +26,10 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+#Ads {
+    position: absolute;
+    top: 25vh;
+    width: 22rem;
+    left: 4rem;
+}

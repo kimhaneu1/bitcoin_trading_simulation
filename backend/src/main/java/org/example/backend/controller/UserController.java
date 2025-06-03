@@ -9,6 +9,8 @@ import org.example.backend.dto.user.response.UserResponseDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
+
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -17,32 +19,27 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping()
-    public ResponseEntity<UserResponseDto> createUser(@RequestBody @Valid UserCreateRequestDto dto) {
-        return ResponseEntity.ok(userService.createUser(dto));
-    }
-
-    @GetMapping("/email/{email}")
-    public ResponseEntity<UserResponseDto> getByEmail(@PathVariable String email) {
-        return ResponseEntity.ok(userService.getUserByEmail(email));
-    }
-
-    @GetMapping("/username/{username}")
-    public ResponseEntity<UserResponseDto> getByUsername(@PathVariable String username) {
-        return ResponseEntity.ok(userService.getUserByUsername(username));
+    public ResponseEntity<UserResponseDto> createUser(
+            @RequestBody @Valid UserCreateRequestDto dto
+    ) {
+        UserResponseDto response = userService.createUser(dto);
+        URI location = URI.create("/api/users/" + response.getId());
+        return ResponseEntity.created(location).body(response);
     }
 
     @PutMapping("/{email}")
     public ResponseEntity<UserResponseDto> updateUser(
             @PathVariable String email,
-            @RequestBody UserUpdateRequestDto dto
+            @RequestBody @Valid UserUpdateRequestDto dto
     ) {
         return ResponseEntity.ok(userService.updateUser(email, dto));
     }
 
     @DeleteMapping("/{email}")
-    public ResponseEntity<Void> deleteUser(@PathVariable String email) {
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable String email
+    ) {
         userService.deleteUser(email);
         return ResponseEntity.noContent().build();
     }
-
 }
