@@ -4,86 +4,85 @@ import lombok.RequiredArgsConstructor;
 import org.example.backend.asset.dto.response.CoinAssetResponseDto;
 import org.example.backend.asset.dto.response.TotalAssetResponseDto;
 import org.example.backend.asset.entity.Asset;
-import org.example.backend.price.service.UpbitPriceService;
+import org.example.backend.global.util.CalculationUtil;
+import org.example.backend.global.util.RealTimePriceService;
 import org.example.backend.user.entity.User;
 import org.example.backend.asset.repository.AssetRepository;
-import org.example.backend.global.security.SecurityUtils;
+import org.example.backend.global.security.core.SecurityUtils;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 
 @Service
 @RequiredArgsConstructor
 public class AssetService {
 
     private final AssetRepository assetRepository;
-    private final UpbitPriceService priceService;
+    private final RealTimePriceService realTimePriceService;
     private final SecurityUtils securityUtils;
 
     public TotalAssetResponseDto getMyAssets() {
         User user = securityUtils.getCurrentUser();
-        List<Asset> assets = assetRepository.findByUser(user);
+        UserAssetEvaluation eval = evaluateUserAssets();
+
         BigDecimal krwBalance = user.getKrwBalance();
+        BigDecimal totalAsset = krwBalance.add(eval.totalEvaluated());
 
-        List<EvaluatedCoin> evaluatedCoins = assets.stream()
+        List<CoinAssetResponseDto> coinDtos = eval.assets().stream()
                 .map(asset -> {
-                    BigDecimal currentPrice = priceService.getCurrentPrice(asset.getCoinSymbol());
-                    BigDecimal evaluatedAmount = currentPrice.multiply(asset.getQuantity());
-                    BigDecimal profitRate = calculateProfitRate(asset.getAvgBuyPrice(), currentPrice);
+                    BigDecimal evaluatedAmount = eval.evaluatedMap().getOrDefault(asset.getCoinSymbol(), BigDecimal.ZERO);
+                    BigDecimal currentPrice = asset.getQuantity().compareTo(BigDecimal.ZERO) == 0
+                            ? BigDecimal.ZERO
+                            : evaluatedAmount.divide(asset.getQuantity(), 8, RoundingMode.HALF_UP);
 
-                    return new EvaluatedCoin(asset.getCoinSymbol(), asset.getQuantity(), evaluatedAmount, profitRate);
+                    BigDecimal profitRate = CalculationUtil.calculateProfitRate(asset.getAvgBuyPrice(), currentPrice);
+
+                    return CoinAssetResponseDto.builder()
+                            .coinSymbol(asset.getCoinSymbol())
+                            .quantity(asset.getQuantity())
+                            .evaluatedAmount(evaluatedAmount)
+                            .profitRate(profitRate)
+                            .holdingRatio(CalculationUtil.calculateHoldingRatio(evaluatedAmount, totalAsset))
+                            .build();
                 })
-                .toList();
-
-        // 총 코인 평가금액 계산
-        BigDecimal totalCoinAsset = evaluatedCoins.stream()
-                .map(EvaluatedCoin::evaluatedAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        // 총 자산 = 현금 + 보유 코인 자산
-        BigDecimal totalAsset = krwBalance.add(totalCoinAsset);
-
-        // 코인별 DTO 구성
-        List<CoinAssetResponseDto> coinDtos = evaluatedCoins.stream()
-                .map(coin -> CoinAssetResponseDto.builder()
-                        .coinSymbol(coin.coinSymbol())
-                        .quantity(coin.quantity())
-                        .evaluatedAmount(coin.evaluatedAmount())
-                        .profitRate(coin.profitRate())
-                        .holdingRatio(calculateHoldingRatio(coin.evaluatedAmount(), totalAsset)) // 전체 자산 대비 비중
-                        .build())
                 .toList();
 
         return TotalAssetResponseDto.builder()
                 .totalAssetAmount(totalAsset)
                 .krwBalance(krwBalance)
-                .krwRatio(calculateHoldingRatio(krwBalance, totalAsset))
-                .coinAssetAmount(totalCoinAsset)
-                .coinRatio(calculateHoldingRatio(totalCoinAsset, totalAsset))
+                .krwRatio(CalculationUtil.calculateHoldingRatio(krwBalance, totalAsset))
+                .coinAssetAmount(eval.totalEvaluated())
+                .coinRatio(CalculationUtil.calculateHoldingRatio(eval.totalEvaluated(), totalAsset))
                 .coinAssets(coinDtos)
                 .build();
     }
 
+    public UserAssetEvaluation evaluateUserAssets() {
+        User user = securityUtils.getCurrentUser();
+        List<Asset> assets = assetRepository.findByUser(user);
 
-    private BigDecimal calculateProfitRate(BigDecimal avgBuyPrice, BigDecimal currentPrice) {
-        if (avgBuyPrice.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;
-        return currentPrice.subtract(avgBuyPrice)
-                .divide(avgBuyPrice, 4, RoundingMode.HALF_UP)
-                .multiply(BigDecimal.valueOf(100));
+        Map<String, BigDecimal> evaluatedMap = new HashMap<>();
+        BigDecimal totalEvaluated = BigDecimal.ZERO;
+
+        for (Asset asset : assets) {
+            BigDecimal price = realTimePriceService.getCurrentPrice(asset.getCoinSymbol());
+            BigDecimal evaluatedAmount = CalculationUtil.calculateEvaluatedAmount(asset.getQuantity(), price);
+            evaluatedMap.put(asset.getCoinSymbol(), evaluatedAmount);
+            totalEvaluated = totalEvaluated.add(evaluatedAmount);
+        }
+
+        return new UserAssetEvaluation(user, assets, evaluatedMap, totalEvaluated);
     }
 
-    private BigDecimal calculateHoldingRatio(BigDecimal amount, BigDecimal total) {
-        if (total.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;
-        return amount.divide(total, 4, RoundingMode.HALF_UP)
-                .multiply(BigDecimal.valueOf(100));
-    }
-
-    private record EvaluatedCoin(
-            String coinSymbol,
-            BigDecimal quantity,
-            BigDecimal evaluatedAmount,
-            BigDecimal profitRate
+    public record UserAssetEvaluation(
+            User user,
+            List<Asset> assets,
+            Map<String, BigDecimal> evaluatedMap,
+            BigDecimal totalEvaluated
     ) {}
 }

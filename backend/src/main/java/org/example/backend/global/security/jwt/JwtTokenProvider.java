@@ -9,7 +9,7 @@ import org.example.backend.global.exception.requestError.auth.InvalidTokenExcept
 import org.example.backend.global.exception.requestError.auth.TokenMissingException;
 import org.example.backend.global.exception.requestError.auth.TokenTypeMismatchException;
 import org.example.backend.auth.repository.RefreshTokenRepository;
-import org.example.backend.global.security.CustomUserDetailsService;
+import org.example.backend.global.security.userdetails.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;

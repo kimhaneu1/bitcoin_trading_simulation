@@ -1,4 +1,4 @@
-package org.example.backend.global.security;
+package org.example.backend.global.security.jwt;
 
 public class AuthWhitelist {
     public static final String[] NO_AUTH_PATHS = {

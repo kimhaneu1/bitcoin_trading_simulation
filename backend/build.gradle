@@ -50,6 +50,9 @@ dependencies {
 	// Bean Validation (JSR-380) 구현체
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
+	// Java-WebSocket
+	implementation 'org.java-websocket:Java-WebSocket:1.5.3'
+
 }
 
 test {

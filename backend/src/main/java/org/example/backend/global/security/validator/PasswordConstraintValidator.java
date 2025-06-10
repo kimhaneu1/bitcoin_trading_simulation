@@ -1,4 +1,4 @@
-package org.example.backend.global.security;
+package org.example.backend.global.security.validator;
 
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;

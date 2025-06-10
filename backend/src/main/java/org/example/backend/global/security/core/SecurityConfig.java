@@ -1,7 +1,9 @@
-package org.example.backend.global.security;
+package org.example.backend.global.security.core;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.global.security.jwt.AuthWhitelist;
 import org.example.backend.global.security.jwt.JwtAuthenticationFilter;
+import org.example.backend.global.security.userdetails.CustomUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;

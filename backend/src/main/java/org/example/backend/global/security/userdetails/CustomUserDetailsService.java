@@ -1,4 +1,4 @@
-package org.example.backend.global.security;
+package org.example.backend.global.security.userdetails;
 
 import lombok.RequiredArgsConstructor;
 import org.example.backend.user.entity.User;

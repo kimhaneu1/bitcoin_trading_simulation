@@ -34,7 +34,11 @@ public enum ErrorCode {
     ASSET_NOT_FOUND(HttpStatus.NOT_FOUND, "1400", "해당 자산을 보유하고 있지 않습니다."),
     ASSET_LIST_EMPTY(HttpStatus.NOT_FOUND, "1401", "보유한 자산이 없습니다."),
 
+    COMMENT_MAX_REACHED(HttpStatus.BAD_REQUEST, "1500", "댓글은 최대 10개까지 작성할 수 있습니다."),
+    COMMENT_NOT_OWNER(HttpStatus.FORBIDDEN, "1501", "본인의 댓글만 삭제할 수 있습니다."),
+
     I_DONT_KNOW(HttpStatus.BAD_REQUEST, "2000", "왜 에러임?"),
+
     ;
 
     private final HttpStatus httpStatus;

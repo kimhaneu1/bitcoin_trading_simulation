@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import jakarta.validation.constraints.Size;
-import org.example.backend.global.security.ValidPassword;
+import org.example.backend.global.security.validator.ValidPassword;
 
 @Getter
 @NoArgsConstructor

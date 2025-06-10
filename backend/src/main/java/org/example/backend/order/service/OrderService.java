@@ -1,12 +1,13 @@
 package org.example.backend.order.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.backend.global.util.CalculationUtil;
+import org.example.backend.global.util.RealTimePriceService;
 import org.example.backend.order.dto.request.OrderCreateRequestDto;
 import org.example.backend.order.dto.request.OrderUpdateRequestDto;
 import org.example.backend.order.dto.response.OrderHistoryResponseDto;
 import org.example.backend.asset.entity.Asset;
 import org.example.backend.order.entity.Order;
-import org.example.backend.price.service.UpbitPriceService;
 import org.example.backend.user.entity.User;
 import org.example.backend.global.enums.OrderMethod;
 import org.example.backend.global.enums.OrderStatus;
@@ -15,12 +16,11 @@ import org.example.backend.global.exception.requestError.asset.AssetNotFoundExce
 import org.example.backend.global.exception.requestError.order.*;
 import org.example.backend.asset.repository.AssetRepository;
 import org.example.backend.order.repository.OrderRepository;
-import org.example.backend.global.security.SecurityUtils;
+import org.example.backend.global.security.core.SecurityUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,11 +33,12 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final AssetRepository assetRepository;
     private final SecurityUtils securityUtils;
-    private final UpbitPriceService priceService;
+    private final RealTimePriceService realTimePriceService;
 
     public OrderHistoryResponseDto createOrder(OrderCreateRequestDto dto) {
         User user = getCurrentUser();
         BigDecimal price = determineOrderPrice(dto);
+        realTimePriceService.subscribe(dto.getCoinSymbol());
         Order order = buildOrder(dto, user, price);
         return toDto(orderRepository.save(order));
     }
@@ -53,11 +54,9 @@ public class OrderService {
     public void deleteOrder(Long orderId) {
         User user = getCurrentUser();
         Order order = getOrderIfOwned(orderId, user);
-
         if (order.getOrderStatus() != OrderStatus.PENDING) {
             throw new OrderNotDeletableException("체결 완료된 주문은 삭제할 수 없습니다.");
         }
-
         orderRepository.delete(order);
     }
 
@@ -72,10 +71,10 @@ public class OrderService {
     public List<OrderHistoryResponseDto> resolvePendingOrders() {
         User user = getCurrentUser();
         List<Order> pendingOrders = orderRepository.findByUserAndOrderStatus(user, OrderStatus.PENDING);
-
         List<OrderHistoryResponseDto> resolved = new ArrayList<>();
+
         for (Order order : pendingOrders) {
-            BigDecimal currentPrice = priceService.getCurrentPrice(order.getCoinSymbol());
+            BigDecimal currentPrice = realTimePriceService.getCurrentPrice(order.getCoinSymbol());
             if (isOrderExecutable(order.getOrderMethod(), order.getOrderType(), order.getPrice(), currentPrice)) {
                 executeOrder(user, order);
                 order.markAsCompleted();
@@ -93,29 +92,56 @@ public class OrderService {
         }
     }
 
-    // ===== 내부 메서드 =====
+    private void executeBuyOrder(User user, Order order) {
+        BigDecimal orderAmount = CalculationUtil.calculateOrderAmount(order.getPrice(), order.getQuantity());
+        if (user.getKrwBalance().compareTo(orderAmount) < 0) {
+            throw new InsufficientBalanceException();
+        }
 
-    private User getCurrentUser() {
-        return securityUtils.getCurrentUser();
+        user.updateKrwBalance(orderAmount.negate());
+        Asset asset = getOrCreateAsset(user, order.getCoinSymbol());
+
+        BigDecimal prevTotal = asset.getQuantity().multiply(asset.getAvgBuyPrice());
+        BigDecimal newQuantity = asset.getQuantity().add(order.getQuantity());
+        BigDecimal newTotal = prevTotal.add(orderAmount);
+
+        asset.updateQuantity(newQuantity);
+        asset.updateAvgBuyPrice(CalculationUtil.calculateAverageBuyPrice(newTotal, newQuantity));
+        assetRepository.save(asset);
+    }
+
+    private void executeSellOrder(User user, Order order) {
+        BigDecimal orderAmount = CalculationUtil.calculateOrderAmount(order.getPrice(), order.getQuantity());
+        Asset asset = assetRepository.findByUserAndCoinSymbol(user, order.getCoinSymbol())
+                .orElseThrow(AssetNotFoundException::new);
+
+        if (asset.getQuantity().compareTo(order.getQuantity()) < 0) {
+            throw new InsufficientAssetException();
+        }
+
+        asset.updateQuantity(asset.getQuantity().subtract(order.getQuantity()));
+        user.updateKrwBalance(orderAmount);
+        assetRepository.save(asset);
+    }
+
+    private Asset getOrCreateAsset(User user, String coinSymbol) {
+        return assetRepository.findByUserAndCoinSymbol(user, coinSymbol)
+                .orElseGet(() -> Asset.builder()
+                        .user(user)
+                        .coinSymbol(coinSymbol)
+                        .quantity(BigDecimal.ZERO)
+                        .avgBuyPrice(BigDecimal.ZERO)
+                        .build());
     }
 
     private BigDecimal determineOrderPrice(OrderCreateRequestDto dto) {
         return dto.getOrderMethod() == OrderMethod.MARKET
-                ? priceService.getCurrentPrice(dto.getCoinSymbol())
+                ? realTimePriceService.getCurrentPrice(dto.getCoinSymbol())
                 : dto.getPrice();
     }
 
-    private Order buildOrder(OrderCreateRequestDto dto, User user, BigDecimal price) {
-        return Order.builder()
-                .user(user)
-                .coinSymbol(dto.getCoinSymbol())
-                .orderType(dto.getOrderType())
-                .orderMethod(dto.getOrderMethod())
-                .orderStatus(OrderStatus.PENDING)
-                .quantity(dto.getQuantity())
-                .price(price)
-                .createdAt(LocalDateTime.now())
-                .build();
+    private User getCurrentUser() {
+        return securityUtils.getCurrentUser();
     }
 
     private Order getOrderIfOwned(Long orderId, User user) {
@@ -145,50 +171,17 @@ public class OrderService {
         };
     }
 
-    private void executeBuyOrder(User user, Order order) {
-        BigDecimal totalAmount = calculateTotalAmount(order.getPrice(), order.getQuantity());
-        if (user.getKrwBalance().compareTo(totalAmount) < 0) {
-            throw new InsufficientBalanceException();
-        }
-
-        user.updateKrwBalance(totalAmount.negate());
-        Asset asset = getOrCreateAsset(user, order.getCoinSymbol());
-
-        BigDecimal prev = asset.getQuantity().multiply(asset.getAvgBuyPrice());
-        BigDecimal newTotal = prev.add(totalAmount);
-        BigDecimal newQuantity = asset.getQuantity().add(order.getQuantity());
-
-        asset.updateQuantity(newQuantity);
-        asset.updateAvgBuyPrice(newTotal.divide(newQuantity, 8, RoundingMode.HALF_UP));
-        assetRepository.save(asset);
-    }
-
-    private void executeSellOrder(User user, Order order) {
-        BigDecimal totalAmount = calculateTotalAmount(order.getPrice(), order.getQuantity());
-        Asset asset = assetRepository.findByUserAndCoinSymbol(user, order.getCoinSymbol())
-                .orElseThrow(AssetNotFoundException::new);
-
-        if (asset.getQuantity().compareTo(order.getQuantity()) < 0) {
-            throw new InsufficientAssetException();
-        }
-
-        asset.updateQuantity(asset.getQuantity().subtract(order.getQuantity()));
-        user.updateKrwBalance(totalAmount);
-        assetRepository.save(asset);
-    }
-
-    private Asset getOrCreateAsset(User user, String coinSymbol) {
-        return assetRepository.findByUserAndCoinSymbol(user, coinSymbol)
-                .orElseGet(() -> Asset.builder()
-                        .user(user)
-                        .coinSymbol(coinSymbol)
-                        .quantity(BigDecimal.ZERO)
-                        .avgBuyPrice(BigDecimal.ZERO)
-                        .build());
-    }
-
-    private BigDecimal calculateTotalAmount(BigDecimal price, BigDecimal quantity) {
-        return price.multiply(quantity);
+    private Order buildOrder(OrderCreateRequestDto dto, User user, BigDecimal price) {
+        return Order.builder()
+                .user(user)
+                .coinSymbol(dto.getCoinSymbol())
+                .orderType(dto.getOrderType())
+                .orderMethod(dto.getOrderMethod())
+                .orderStatus(OrderStatus.PENDING)
+                .quantity(dto.getQuantity())
+                .price(price)
+                .createdAt(LocalDateTime.now())
+                .build();
     }
 
     private OrderHistoryResponseDto toDto(Order order) {
@@ -197,7 +190,7 @@ public class OrderService {
                 .coinSymbol(order.getCoinSymbol())
                 .quantity(order.getQuantity())
                 .price(order.getPrice())
-                .totalAmount(calculateTotalAmount(order.getPrice(), order.getQuantity()))
+                .totalAmount(CalculationUtil.calculateOrderAmount(order.getPrice(), order.getQuantity()))
                 .orderType(order.getOrderType())
                 .orderStatus(order.getOrderStatus())
                 .createdAt(order.getCreatedAt())
