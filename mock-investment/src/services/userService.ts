@@ -17,15 +17,15 @@ interface SignupResponse {
 
 class UserService {
   async signup(data: SignupRequest): Promise<SignupResponse> {
-    return apiClient.post<SignupResponse>('/users', data);
+    return apiClient.post<SignupResponse>('/api/users', data);
   }
 
   async getUserByEmail(email: string): Promise<SignupResponse> {
-    return apiClient.get<SignupResponse>(`/users/email/${email}`);
+    return apiClient.get<SignupResponse>(`/api/users/email/${email}`);
   }
 
   async deleteUser(email: string): Promise<void> {
-    await apiClient.delete<void>(`/users/${email}`);
+    await apiClient.delete<void>(`/api/users/${email}`);
   }
 }
 

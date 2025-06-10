@@ -92,5 +92,5 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient(
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api'
+  process.env.NEXT_PUBLIC_API_URL || 'http://13.125.210.125:8080'
 );
